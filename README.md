@@ -34,35 +34,48 @@ outils désignés par capacités et non par providers, chemins génériques).
 **Note de chargement** : les skills ajoutées n'apparaissent dans une session
 OpenCode qu'après redémarrage (l'inventaire est établi au démarrage).
 
-## Installation autonome (nouvelle machine ou après installation de superpowers)
+## Installation — deux scripts, deux niveaux
 
 Ce dépôt est **autonome** : il ne patche que le cache du paquet, jamais de
-chemin machine en dur. Séquence complète :
+chemin machine en dur. Workflow complet :
+
+### 1. Nouvelle machine — `./init-machine.sh` (UNE fois)
 
 ```bash
-# 1. Superpowers installé comme plugin opencode (une fois par machine) :
-#    ~/.config/opencode/opencode.jsonc → "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
-# 2. Cloner CE dépôt où vous voulez, puis :
-./reinjecter.sh
-# 3. Redémarrer OpenCode (l'inventaire des skills est établi au démarrage).
+git clone https://github.com/Userdebug/superpowers-patches.git
+cd superpowers-patches
+./init-machine.sh
+# → déclare le plugin superpowers dans ~/.config/opencode/opencode.jsonc
+#   (opencode le télécharge au prochain démarrage) puis lance reinjecter.sh
 ```
 
-Après une mise à jour du paquet superpowers (le cache est écrasé), relancer
-simplement `./reinjecter.sh` — idempotent, backups horodatés automatiques.
+Redémarrer OpenCode : les skills patchées/ajoutées et le hub STEP 0 sont
+alors **automatiquement actifs dans tous les projets** de la machine.
 
-### Intégration optionnelle par projet (portable)
+Après chaque mise à jour du paquet superpowers (cache écrasé), relancer
+`./reinjecter.sh` — idempotent, backups horodatés automatiques.
 
-`templates/project/` contient le triptyque qui branche l'état des outils dans
-chaque projet, à l'abri de `/init` :
+### 2. Chaque projet — `./init-project.sh` (UNE fois par projet)
 
-| Fichier | Destination dans le projet | Rôle |
+```bash
+./init-project.sh /chemin/du/projet
+```
+
+Installe le triptyque qui persiste l'état des outils par projet, à l'abri
+de `/init` :
+
+| Élément | Destination | Rôle |
 |---|---|---|
-| `opencode.json.snippet` | `opencode.json` (fusion) | charge `.opencode/instructions/*.md` dans chaque session |
-| `commands/capacites.md` | `.opencode/commands/capacites.md` | commande `/capacites` : sonde live + régénère l'état |
-| `instructions/capacites-outils.example.md` | `.opencode/instructions/` (via `/capacites`) | format canonique de l'état généré |
+| commande `/capacites` | `.opencode/commands/capacites.md` | sonde live + régénère l'état |
+| dossier d'état | `.opencode/instructions/` | reçoit `capacites-outils.md` |
+| branchement | `opencode.json` (`"instructions"`, fusion idempotente) | charge l'état dans chaque session |
 
-Règle : l'état des outils ne vit JAMAIS dans AGENTS.md (réécrit par `/init`),
-uniquement dans ce fichier dédié + les faits connus datés dans AGENTS.md.
+Ensuite dans OpenCode : `/capacites`, puis committer `opencode.json` + `.opencode/`.
+
+Sans cette étape, le patch reste actif mais rien n'est persisté : chaque
+session re-sonde depuis zéro. Règle : l'état des outils ne vit JAMAIS dans
+AGENTS.md (réécrit par `/init`) — uniquement dans ce fichier dédié, avec les
+faits datés en plus dans AGENTS.md.
 
 ## Après chaque mise à jour du paquet superpowers
 
