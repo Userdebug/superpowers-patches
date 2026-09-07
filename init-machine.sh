@@ -5,7 +5,9 @@
 # Actions :
 #   1. Vérifie/crée la config globale opencode avec le plugin superpowers déclaré
 #      (opencode télécharge et installe le plugin au prochain démarrage).
-#   2. Injecte les patches de skills dans le cache du paquet (reinjeter.sh).
+#   2. Injecte les patches de skills dans le cache du paquet (reinjecter.sh).
+#   3. Propage les skills opérationnelles vers ~/.agents/skills/ (propager_skills.sh),
+#      source réellement chargée par la session — jamais écrasée.
 #
 # Ensuite, pour CHAQUE projet : ./init-project.sh /chemin/du/projet
 set -euo pipefail
@@ -39,6 +41,11 @@ fi
 
 # --- 2. Injection des patches dans le cache du paquet ---
 "${SCRIPT_DIR}/reinjecter.sh"
+
+# --- 3. Propagation des skills opérationnelles vers ~/.agents/skills/ ---
+# La session charge ~/.agents/skills/ (source CURATÉE), pas le cache plugin.
+# Les skills ajoutées y sont copiées sans jamais écraser l'existant curaté.
+"${SCRIPT_DIR}/propager_skills.sh"
 
 echo ""
 echo "Machine initialisée. Étapes suivantes :"

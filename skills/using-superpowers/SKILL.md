@@ -29,6 +29,14 @@ When multiple skills apply, process skills come first — they set the approach,
 
 - "Let's build X" → superpowers:brainstorming first, then implementation skills.
 - "Fix this bug" → superpowers:systematic-debugging first, then domain skills.
+- "Heavy task / refactoring / modularization / plan execution" → superpowers:using-git-worktrees FIRST (isolate the worktree), then the implementation skill (code-refactor, modularization, executing-plans).
+- "Unclear requirements / uncertain approach / must not guess" → superpowers:resolve-ambiguity (gather facts, kill the guess).
+- "2+ independent tasks with no shared state" → superpowers:dispatching-parallel-agents (one agent per problem domain).
+- "Clean up / simplify / refactor / dead code / repeated patterns" → superpowers:simplification (find elimination cascades before new code).
+- "Non-obvious fix / workaround / 'remember this pattern'" → superpowers:learning (save so it's never solved twice).
+- "Package / build / release / cross-platform / CI failure" → superpowers:pre-deploy (deliverable readiness).
+- "Code quality / naming / conventions review" → superpowers:coding-standards (project rules gate).
+- "Security-sensitive feature / secrets / untrusted input / signing" → superpowers:security-review (threat model first).
 
 ## STEP 0 — Capability Discovery Protocol
 
@@ -89,6 +97,7 @@ If your harness appears here, read its reference file for special instructions:
 - Pi: `references/pi-tools.md`
 - Antigravity: `references/antigravity-tools.md`
 - Hermes Agent: `references/hermes-tools.md`
+- OpenCode (CLI, TUI, VSCode extension): `references/opencode.md`
 
 ## User Instructions
 

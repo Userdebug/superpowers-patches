@@ -30,6 +30,7 @@ outils désignés par capacités et non par providers, chemins génériques).
 | `simplification/SKILL.md` | Nettoyage tactique + cascades d'élimination conceptuelle ; VCS plutôt que .bak ; diagnostics IDE d'abord | Améliorée depuis la source Kilo Code |
 | `code-refactor/SKILL.md` | Refactoring universel ; découverte par capacités sémantiques (search_symbol → call hierarchy → fallback texte), rename sémantique obligatoire, règle « un producteur par donnée dérivée » | Réécrite (la source était grep-centrée, aveugle aux alias) |
 | `learning/SKILL.md` | Base de connaissances persistante `{repo}/docs/learnings/` : find / evaluate (tiers) / draft / micro-approval / maintenance JIT | Généralisée (chemins Kilo retirés) |
+| `modularization/SKILL.md` | Restructuration monolithique → modulaire (`src/` pur, `ops/`, `data/` gitignoré, `extensions/`, `tests/` unit/integration/fixtures) ; 4 phases à **Gateways** de validation utilisateur obligatoires, `git mv` pour l'historique, config dynamique + isolation de test | Réécrite en anglais (la source FR avait un frontmatter absent et des commandes provider-spécifiques) |
 
 **Note de chargement** : les skills ajoutées n'apparaissent dans une session
 OpenCode qu'après redémarrage (l'inventaire est établi au démarrage).
@@ -84,13 +85,84 @@ lors des mises à jour. Relancer :
 
 ```bash
 ./reinjecter.sh
+./propager_skills.sh                                         # skills perdues de ~/.agents/skills/
+cp skills/using-superpowers/SKILL.md ~/.agents/skills/using-superpowers/SKILL.md
+cp skills/using-superpowers/references/opencode.md ~/.agents/skills/using-superpowers/references/opencode.md
 ```
 
 Le script détecte automatiquement toutes les versions installées, sauvegarde l'état
-courant dans `_backup_cache/<horodatage>/` puis applique les patches. Idempotent.
+courant dans `_backup_cache/<horodatage>/` puis applique les patches. Depuis la version
+actuelle, il synchronise aussi le dossier `references/` des skills patchées (ex.
+`using-superpowers/references/opencode.md`, `pre-deploy/references/build-matrix.md`).
+Idempotent.
+
+**Exception hub :** `using-superpowers` est patché dans le cache MAIS la session le
+charge depuis `~/.agents/skills/`. Comme le hub doit suivre le patch (contrairement
+aux skills « curatées »), sa copie est resynchronisée à la MAIN via les `cp` ci-dessus
+après chaque retouche du hub. Les autres skills présentes dans `~/.agents/skills/`
+restent préservées par `propager_skills.sh`.
 
 Si une mise à jour upstream restructure un fichier (skill renommée, etc.), le script
 avertit et ignore ce fichier : mettre à jour alors manuellement le patch ici.
+
+## Pilotage générique d'OpenCode — le hub et sa référence de plateforme
+
+Le but est de **piloter OpenCode depuis ses sources de pilotage** de façon
+**générique** : la config injectée ne doit rien connaître du projet courant.
+Elle s'applique à tout harnais opencode — CLI/TUI, extension VS Code (config
+réinjectée telle quelle), JetBrains via le pont `pycharm_*` — bref, partout où
+opencode démarre avec ces sources.
+
+### Les sources de pilotage (hiérarchie)
+
+1. **`using-superpowers/SKILL.md` (le hub)** — racine du pilotage, chargé à
+   chaque session : règle d'invocation, priorités de skills, « STEP 0 » de
+   découverte des capacités, mapping sémantique fournisseur-agnostique.
+2. **`using-superpowers/references/opencode.md`** — fiche plateforme : carte
+   des outils natifs (`todowrite`/`task`/`skill`/`edit`/…), conventions subagents,
+   providers sémantiques (JetBrains / VS Code LSP / mode CLI natif), règles git.
+3. **Les autres SKILL.md patchées/ajoutées** — implémentations, invoquées via le
+   déclencheur du hub ou leur `description` (`<available_skills>`).
+4. **`AGENTS.md` / instructions projet** — projet uniquement, jamais injectées
+   ici ; elles *supplantent* les skills si conflit.
+
+### Sept 2026 — mise aux normes « pilotes » (ce commit)
+
+| Correctif | Quoi | Pourquoi |
+|---|---|---|
+| Priorités hub | Déclencheurs génériques pour `resolve-ambiguity`, `dispatching-parallel-agents`, `simplification`, `learning`, `pre-deploy`, `coding-standards`, `security-review` | Ces skills n'étaient référencées nulle part (seul le mécanisme 2 `<available_skills>` les exposait). Le hub ne listait explicitement que brainstorming / systematic-debugging / using-git-worktrees. |
+| `references/opencode.md` | Fiche outillage native OpenCode, ajoutée à `using-superpowers/references/` + entrée « OpenCode (CLI, TUI, VSCode extension) » dans « Platform Adaptation » du hub | Le hub disait « if your harness appears here, read its reference file » sans fichier pour OpenCode (codex.md / pi-tools.md / antigravity-tools.md / hermes-tools.md seuls). |
+| `reinjecter.sh` | Synchronise **aussi** `references/` des skills patchées (pas seulement le SKILL.md) | `pre-deploy/references/build-matrix.md` n'était jamais déployé ; idem pour l'opencode.md du hub. |
+| `propager_skills.sh` + README | Exception **hub** documentée : `using-superpowers` doit suivre le patch → resync manuelle des cp vers `~/.agents/skills/` | `propager_skills.sh` ne copie que les skills ABSENTES (jamais d'écrasement des curatées), or le hub doit être à jour partout. |
+
+**Vérification de cohérence** (triplet) : après réinjection, comparer que
+`superpowers-patches/skills/<nom>`, le cache plugin et `~/.agents/skills/`
+contiennent la même version du SKILL.md *et* des annexes `references/` :
+`cmp -s fichier1 fichier2` sur les trois paires.
+
+### Cycle de vie d'une amélioration de pilotage
+
+```
+1. Modifier le patch : superpowers-patches/skills/<nom>/SKILL.md (+ references/ au besoin)
+2. ./reinjecter.sh                      → cache plugin (backup horodaté avant écrasement)
+3. ./propager_skills.sh                 → skills absentes de ~/.agents/skills/
+4. SI le hub a changé : cp manuel       → ~/.agents/skills/using-superpowers/ (exception)
+5. Commiter + pousser ici               → disponible sur la prochaine machine/VSCode
+6. Redémarrer opencode                  → inventaire des skills reconstruit
+```
+
+## Deux sources, deux rôles (important)
+
+- **`~/.agents/skills/`** — source **réellement chargée par la session** OpenCode.
+  C'est la seule qui compte pour l'exécution. Elle contient les versions **curatées**
+  (retravaillées). `reinjecter.sh` n'y touche PAS.
+- **Cache plugin `~/.cache/.../superpowers/skills/`** — reconstruit/écrasé par OpenCode
+  à chaque mise à jour du paquet. `reinjecter.sh` réapplique les skills patchées ici.
+
+`propager_skills.sh` fait le pont : il copie les skills **ajoutées** de
+`superpowers-patches/skills/` vers `~/.agents/skills/`, **sans jamais écraser**
+une skill curatée existante (elle est préservée). Il est appelé automatiquement par
+`init-machine.sh` et peut être relancé manuellement si besoin.
 
 ## Restauration
 
