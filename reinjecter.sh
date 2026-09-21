@@ -8,6 +8,7 @@
 set -euo pipefail
 
 PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_ROOT="${BACKUP_ROOT:-${PATCH_DIR}/_backup_cache}"
 PACKAGES_ROOT="${HOME}/.cache/opencode/packages"
 
 # Le nom du paquet contient des sous-répertoires (superpowers@git+https:/github.com/...),
@@ -47,7 +48,7 @@ for cible in "${cibles[@]}"; do
             nb_fichiers=$((nb_fichiers + 1))
             continue
         fi
-        backup_dir="${PATCH_DIR}/_backup_cache/${horodatage}/${skill}"
+        backup_dir="${BACKUP_ROOT}/${horodatage}/${skill}"
         mkdir -p "$backup_dir"
         cp "$dest" "${backup_dir}/SKILL.md"
         cp "$src" "$dest"
@@ -55,7 +56,7 @@ for cible in "${cibles[@]}"; do
         if cmp -s "$src" "${backup_dir}/SKILL.md"; then
             echo "  ${skill}/SKILL.md : déjà à jour (backup inchangé)"
         else
-            echo "  ${skill}/SKILL.md : patché (ancienne version → _backup_cache/${horodatage}/${skill}/)"
+            echo "  ${skill}/SKILL.md : patché (ancienne version → ${BACKUP_ROOT}/${horodatage}/${skill}/)"
         fi
         # Annexes root (ex. security-review/cloud-infrastructure-security.md) + references/
         for annexe in "${skill_dir}"/*; do
@@ -76,4 +77,4 @@ for cible in "${cibles[@]}"; do
 done
 
 echo ""
-echo "Terminé : ${nb_fichiers} fichier(s) réinjecté(s). Backups dans _backup_cache/${horodatage}/"
+echo "Terminé : ${nb_fichiers} fichier(s) réinjecté(s). Backups dans ${BACKUP_ROOT}/${horodatage}/"
