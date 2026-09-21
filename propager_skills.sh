@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # propager_skills.sh — synchronise les skills opérationnelles vers ~/.agents/skills/.
 #
-# La session OpenCode charge les skills depuis ~/.agents/skills/, PAS depuis le
-# cache du plugin superpowers. Or reinjecter.sh ne maintient que le cache plugin.
-# Afin que les skills ajoutées (ui-governance, security-review, coding-standards, …)
-# restent disponibles après une MISE À JOUR du paquet superpowers (cache écrasé)
-# ou sur une NOUVELLE MACHINE, ce script copie le dossier skill complet depuis
+# Deux sources, deux rôles : la session OpenCode charge les skills depuis le
+# CACHE du plugin superpowers (~/.cache/opencode/packages/superpowers@*/…),
+# MAINtenu par reinjecter.sh — PAS depuis ~/.agents/skills/. Le dossier
+# ~/.agents/skills/ sert les AUTRES harnais (Claude Code, Cursor, …).
+# Ce script y propage donc les skills ajoutées (ui-governance, security-review,
+# coding-standards, …) pour qu'elles restent disponibles sur ces autres harnais
+# après une MISE À JOUR du paquet superpowers (cache écrasé) ou sur une NOUVELLE
+# MACHINE, en copiant le dossier skill complet depuis
 # superpowers-patches/skills/<nom>/ vers ~/.agents/skills/<nom>/.
 #
 # Règles :

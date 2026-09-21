@@ -105,11 +105,12 @@ actuelle, il synchronise **toutes les annexes** des skills patchées — le doss
 `pre-deploy/references/build-matrix.md`) **et** les annexes racines des dossiers skills
 (ex. `security-review/cloud-infrastructure-security.md`). Idempotent.
 
-**Exception hub :** `using-superpowers` est patché dans le cache MAIS la session le
-charge depuis `~/.agents/skills/`. Comme le hub doit suivre le patch (contrairement
-aux skills « curatées »), sa copie est resynchronisée à la MAIN via les `cp` ci-dessus
-après chaque retouche du hub. Les autres skills présentes dans `~/.agents/skills/`
-restent préservées par `propager_skills.sh`.
+**Exception hub :** `using-superpowers` doit toujours suivre le patch. Sa copie
+dans `~/.agents/skills/` (servant les AUTRES harnais — Claude Code, Cursor…) est
+donc resynchronisée à la MAIN via les `cp` ci-dessous après chaque retouche du
+hub — la session opencode, elle, charge le hub depuis le cache plugin comme les
+autres skills. Les autres skills présentes dans `~/.agents/skills/` restent
+préservées par `propager_skills.sh`.
 
 Si une mise à jour upstream restructure un fichier (skill renommée, etc.), le script
 avertit et ignore ce fichier : mettre à jour alors manuellement le patch ici.
@@ -141,13 +142,15 @@ opencode démarre avec ces sources.
 |---|---|---|
 | Priorités hub | Déclencheurs génériques pour `resolve-ambiguity`, `dispatching-parallel-agents`, `simplification`, `learning`, `pre-deploy`, `coding-standards`, `security-review` | Ces skills n'étaient référencées nulle part (seul le mécanisme 2 `<available_skills>` les exposait). Le hub ne listait explicitement que brainstorming / systematic-debugging / using-git-worktrees. |
 | `references/opencode.md` | Fiche outillage native OpenCode, ajoutée à `using-superpowers/references/` + entrée « OpenCode (CLI, TUI, VSCode extension) » dans « Platform Adaptation » du hub | Le hub disait « if your harness appears here, read its reference file » sans fichier pour OpenCode (codex.md / pi-tools.md / antigravity-tools.md / hermes-tools.md seuls). |
-| `reinjecter.sh` | Synchronise **aussi** `references/` des skills patchées (pas seulement le SKILL.md) | `pre-deploy/references/build-matrix.md` n'était jamais déployé ; idem pour l'opencode.md du hub. |
+| `reinjecter.sh` | Synchronise **désormais toutes les annexes** (`references/` + annexes racines) des skills patchées | `pre-deploy/references/build-matrix.md` n'était jamais déployé ; idem pour l'opencode.md du hub. |
 | `propager_skills.sh` + README | Exception **hub** documentée : `using-superpowers` doit suivre le patch → resync manuelle des cp vers `~/.agents/skills/` | `propager_skills.sh` ne copie que les skills ABSENTES (jamais d'écrasement des curatées), or le hub doit être à jour partout. |
 
 **Vérification de cohérence** (triplet) : après réinjection, comparer que
-`superpowers-patches/skills/<nom>`, le cache plugin et `~/.agents/skills/`
-contiennent la même version du SKILL.md *et* des annexes `references/` :
-`cmp -s fichier1 fichier2` sur les trois paires.
+`superpowers-patches/skills/<nom>` et le cache plugin contiennent la même version
+du SKILL.md *et* des annexes `references/` : `cmp -s fichier1 fichier2`.
+⚠️ `~/.agents/skills/<nom>` peut elle volontairement différer du patch pour les
+skills curatées (sauf si `--force` a été utilisé) — l'égalité du triplet ne
+vaut donc que pour cache plugin ↔ patch.
 
 ### Cycle de vie d'une amélioration de pilotage
 
