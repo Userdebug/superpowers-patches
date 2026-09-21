@@ -24,7 +24,7 @@ AGENTS_SKILLS="${HOME}/.agents/skills"
 FORCE=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --force) FORCE="${2:-}"; shift 2 ;;
+        --force) if [ $# -ge 2 ]; then FORCE="$2"; shift 2; else echo "usage: $0 [--force <skill>]" >&2; exit 1; fi ;;
         *) echo "usage: $0 [--force <skill>]" >&2; exit 1 ;;
     esac
 done
