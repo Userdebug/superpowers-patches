@@ -1,28 +1,23 @@
 #!/usr/bin/env bash
-# propager_skills.sh — synchronise les skills opérationnelles vers ~/.agents/skills/.
+# propager_skills.sh — synchronise les skills opérationnelles vers deux destinations :
 #
-# Deux sources, deux rôles : la session OpenCode charge les skills depuis le
-# CACHE du plugin superpowers (~/.cache/opencode/packages/superpowers@*/…),
-# maintenu par reinjecter.sh — PAS depuis ~/.agents/skills/. Le dossier
-# ~/.agents/skills/ sert les AUTRES harnais (Claude Code, Cursor, …).
-# Ce script y propage donc les skills ajoutées (ui-governance, security-review,
-# coding-standards, …) pour qu'elles restent disponibles sur ces autres harnais
-# après une MISE À JOUR du paquet superpowers (cache écrasé) ou sur une NOUVELLE
-# MACHINE, en copiant le dossier skill complet depuis
-# superpowers-patches/skills/<nom>/ vers ~/.agents/skills/<nom>/.
+#   1) ~/.config/opencode/personal-skills/   — MIROIR OpenCode (variante B).
+#      La session opencode charge les skills depuis ce dossier : le mini-plugin
+#      plugin/personal-skills.js le pousse en DERNIÈRE position de skills.paths
+#      (le loader « dernier écrit gagne »), donc nos versions gagnent sur le
+#      cache du paquet superpowers. Toujours écrasé = miroir fidèle du patch.
 #
-# Règles :
-#   - NE JAMAIS écraser une skill déjà présente dans ~/.agents/skills/ :
-#     ce dossier est la source CURATÉE (versions retravaillées) — on respecte.
-#   - Idempotent : relançable sans risque.
-#   - N'agit que sur les skills ABSENTES de ~/.agents/skills/.
-#   - EXCEPTION : using-superpowers (le hub) doit SUIVRE le patch. Sa copie
-#     dans ~/.agents/skills/ est donc resynchronisée à la main après toute
-#     modification du hub (reinjecter.sh + cp manuel, voir README).
+#   2) ~/.agents/skills/   — AUTRES harnais (Claude Code, Cursor, …).
+#      Règles : NE JAMAIS écraser une skill déjà présente (curatée, respectée) ;
+#      seule une dérogation explicite (--force <skill>) resynchronise, avec
+#      backup dans ~/.agents/skills_backup/<horodatage>/ avant écrasement.
+#
+# Idempotent : relançable sans risque.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTS_SKILLS="${HOME}/.agents/skills"
+PERSONAL_SKILLS="${HOME}/.config/opencode/personal-skills"
 
 FORCE=""
 while [ $# -gt 0 ]; do
@@ -81,6 +76,17 @@ if [ -n "$FORCE" ] && [ "$nb" -eq 0 ]; then
     echo "AVERTISSEMENT : skill « ${FORCE} » introuvable dans ${SCRIPT_DIR}/skills/." >&2
 fi
 
+# --- Miroir OpenCode : ~/.config/opencode/personal-skills/ (TOUJOURS écrasé) ---
+mkdir -p "${PERSONAL_SKILLS}"
+nb_perso=0
+for src in "${SCRIPT_DIR}"/skills/*/; do
+    [ -d "$src" ] || continue
+    skill="$(basename "$src")"
+    rm -rf "${PERSONAL_SKILLS}/${skill}"
+    cp -r "$src" "${PERSONAL_SKILLS}/${skill}"
+    nb_perso=$((nb_perso + 1))
+done
+
 echo ""
-echo "Terminé : ${nb} skill(s) propagée(s). Source : ${SCRIPT_DIR}/skills/ → ${AGENTS_SKILLS}/"
-echo "Note : les skills déjà présentes sont préservées (jamais écrasées)."
+echo "Miroir OpenCode : ${nb_perso} skill(s) → ${PERSONAL_SKILLS}/"
+echo "~/.agents/skills : ${nb} skill(s) propagée(s) — curatées préservées (jamais écrasées sans --force)."
