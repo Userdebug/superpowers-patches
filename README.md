@@ -74,15 +74,25 @@ Même invariant que le loader : vérifié dans les deux ordres de déclaration.
 Installé à `~/.config/opencode/plugins/personal-skills.js` (par `init-machine.sh`),
 déclaré APRÈS `superpowers@git+…` dans `"plugin"`. Deux hooks :
 
-1. `config()` — ajoute `~/.config/opencode/personal-skills` en **dernière** position
-   de `config.skills.paths` (après le cache poussé par superpowers).
+1. `config()` — 
+   - ajoute `~/.config/opencode/personal-skills` en **dernière** position
+     de `config.skills.paths` (après le cache poussé par superpowers) ;
+   - ajoute le glob `".opencode/instructions/*.md"` à `config.instructions`
+     (config universelle — option B). opencode résout ce glob **relatif au
+     projet de travail** (pas au dossier de config) : le fichier d'état du
+     triptyque est donc chargé dans chaque session, sans rien écrire dans le
+     projet. Les instructions projet existantes (ex. `AGENTS.md`) sont
+     conservées (concaténation, jamais écrasées). La déduplication est sur chaîne
+     exacte : si un projet écrivait le glob préfixé `./`, il ne serait pas fusionné
+     (cas sans risque, l'ancien init-project.sh utilisait la même chaîne exacte).
 2. `experimental.chat.messages.transform` — remplace le bootstrap injecté par le
    texte personnel lu depuis `personal-skills/using-superpowers/SKILL.md` (ou injecte
    son propre texte si `EXTREMELY_IMPORTANT` est absent du premier message).
 
 Tests : `tests/plugin-unit.test.mjs` (unitaires Node), `tests/test_plugin_loader.sh`
-(intégration loader : 13 → miroir, dans les deux ordres de déclaration). Le plugin est
-sans dépendance (`path`/`fs`/`os`).
+(intégration loader : 13 → miroir, dans les deux ordres de déclaration + glob
+d'instructions présent dans la config résolue), `tests/test_init_machine.sh`
+(init-machine sur HOME simulé). Le plugin est sans dépendance (`path`/`fs`/`os`).
 
 > **Note `OPENCODE_CONFIG_DIR`** : le plugin résout son miroir via `OPENCODE_CONFIG_DIR`
 > s'il est défini (sinon `~/.config/opencode`), comme `superpowers.js` ; `propager_skills.sh`
@@ -90,7 +100,7 @@ sans dépendance (`path`/`fs`/`os`).
 > `OPENCODE_CONFIG_DIR` personnalisé, le miroir doit être déployé dans CE répertoire —
 > comme le fait le test d'intégration.
 
-## Installation — init-machine + init-project
+## Installation — init-machine (config universelle)
 
 Ce dépôt est **autonome** : il ne patche jamais le cache du paquet, aucun chemin
 machine en dur dans le code versionné. Workflow complet :
@@ -102,35 +112,38 @@ git clone https://github.com/Userdebug/superpowers-patches.git
 cd superpowers-patches
 ./init-machine.sh
 # → déclare le plugin superpowers dans ~/.config/opencode/opencode.json(c)
-#   + installe notre mini-plugin personnel APRÈS + lance propager_skills.sh
+#   + installe notre mini-plugin personnel APRÈS
+#   + installe la commande /capacites (universelle)
+#   + lance propager_skills.sh
 ```
 
-`init-machine.sh` fait trois choses :
+`init-machine.sh` fait quatre choses :
 1. s'assure que `superpowers@git+…` est déclaré ;
 2. copie `plugin/personal-skills.js` vers `~/.config/opencode/plugins/` et l'ajoute
    DANS le tableau `"plugin"`, APRÈS superpowers (JSON strict injecté par python3,
    sinon ACTION MANUELLE affichée) ;
-3. lance `propager_skills.sh` (miroir opencode + `~/.agents/skills/`).
+3. copie `templates/project/commands/capacites.md` vers
+   `~/.config/opencode/commands/` (commande `/capacites` universelle, disponible
+   dans chaque projet) ;
+4. lance `propager_skills.sh` (miroir opencode + `~/.agents/skills/`).
 
 Redémarrer OpenCode : les 13 extensions et le hub personnel sont alors
 **automatiquement actifs** (le cache du paquet reste intouché).
 
-### 2. Chaque projet — `./init-project.sh` (UNE fois par projet)
+### 2. Tout projet opencode — config universelle (AUCUNE action d'installation)
 
-```bash
-./init-project.sh /chemin/du/projet
-```
+Le triptyque capacités est désormais injecté **au niveau machine**, sans rien à écrire
+dans le projet :
 
-Installe le triptyque qui persiste l'état des outils par projet, à l'abri
-de `/init` :
-
-| Élément | Destination | Rôle |
+| Élément | Destination (machine) | Rôle |
 |---|---|---|
-| commande `/capacites` | `.opencode/commands/capacites.md` | sonde live + régénère l'état |
-| dossier d'état | `.opencode/instructions/` | reçoit `capacites-outils.md` |
-| branchement | `opencode.json` (`"instructions"`, fusion idempotente) | charge l'état dans chaque session |
+| commande `/capacites` | `~/.config/opencode/commands/capacites.md` | sonde la session + régénère l'état dans le projet courant |
+| glob d'instructions | injecté par le mini-plugin (`config.instructions`) | charge `.opencode/instructions/*.md` dans chaque session |
+| état des outils | `.opencode/instructions/capacites-outils.md` (projet) | créé par `/capacites`, committé |
 
-Ensuite dans OpenCode : `/capacites`, puis committer `opencode.json` + `.opencode/`.
+Dans chaque projet (ou chaque nouveau projet) : taper `/capacites`, puis committer
+le fichier d'état généré (`git add .opencode/instructions/capacites-outils.md`). Pas
+d'`opencode.json` à éditer, pas de commande à répliquer : la config est universelle.
 
 Sans cette étape, le patch reste actif mais rien n'est persisté : chaque
 session re-sonde depuis zéro. Règle : l'état des outils ne vit JAMAIS dans

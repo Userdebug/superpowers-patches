@@ -72,7 +72,16 @@ EOF
         echo "FAIL [${ORDER}]: using-superpowers ne contient pas notre marqueur curaté" >&2
         exit 1
     fi
-    echo "  [${ORDER}] : OK (${nb} skills → personal-skills, hub = version personnelle curatée)"
+
+    # Config universelle (option B) : le plugin injecte le glob d'instructions
+    # du triptyque capacités dans la config résolue — applicable à tout projet.
+    OPENCODE_CONFIG_DIR="$CFG" XDG_CONFIG_HOME="$TMP/xdg" opencode debug config > "$TMP/config.json" 2> "$TMP/err.log" \
+        || { cat "$TMP/err.log" >&2; echo "FAIL [${ORDER}]: opencode debug config a échoué" >&2; exit 1; }
+    if ! grep -q '"\.opencode/instructions/\*\.md"' "$TMP/config.json"; then
+        echo "FAIL [${ORDER}]: glob instructions du triptyque absent de la config résolue" >&2
+        exit 1
+    fi
+    echo "  [${ORDER}] : OK (${nb} skills → personal-skills, hub = version personnelle curatée, config universelle injectée)"
 done
 
 echo "test_plugin_loader : OK"
