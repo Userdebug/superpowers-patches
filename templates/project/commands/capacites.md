@@ -33,3 +33,4 @@ Règles :
 - Marque chaque outil défaillant avec la date du jour et son fallback retenu.
 - Si AGENTS.md ne définit pas de symbole sonde, propose-en un et demande confirmation AVANT de l'y ajouter (section « Outils sémantiques »).
 - Idempotent : relançable à tout moment pour rafraîchir l'état.
+- Termine le fichier par une nouvelle ligne finale (UNIQUEMENT l'état généré, pas d'autres fichiers).

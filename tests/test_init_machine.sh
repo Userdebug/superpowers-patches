@@ -34,6 +34,10 @@ cmp -s "$CFG_DIR/plugins/personal-skills.js" "$PATCH_DIR/plugin/personal-skills.
 [ -f "$CFG_DIR/commands/capacites.md" ] || { echo "FAIL : commande /capacites absente de ${CFG_DIR}/commands/" >&2; exit 1; }
 cmp -s "$CFG_DIR/commands/capacites.md" "$PATCH_DIR/templates/project/commands/capacites.md" \
     || { echo "FAIL : commande /capacites non conforme au template" >&2; exit 1; }
+# Le template doit prescrire une NOUVELLE LIGNE FINALE pour le fichier d'état
+# (sans quoi le modèle régénère un fichier sans \n final — vu sur School-App/POSS APP).
+grep -qi "nouvelle ligne finale" "$PATCH_DIR/templates/project/commands/capacites.md" \
+    || { echo "FAIL : template /capacites ne prescrit pas la nouvelle ligne finale" >&2; exit 1; }
 
 # Miroir personal-skills propagé : IDENTIQUE au compte réel du dépôt.
 [ -d "$CFG_DIR/personal-skills/using-superpowers" ] || { echo "FAIL : miroir personal-skills absent (hub manquant)" >&2; exit 1; }
