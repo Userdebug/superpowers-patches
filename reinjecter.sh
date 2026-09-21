@@ -57,19 +57,21 @@ for cible in "${cibles[@]}"; do
         else
             echo "  ${skill}/SKILL.md : patché (ancienne version → _backup_cache/${horodatage}/${skill}/)"
         fi
-        # Fichiers annexes (ex. references/) présents dans le patch : synchronisés
-        # pour les skills patchées (les skills AJOUTÉES sont copiées complètes plus haut).
-        if [ -d "${skill_dir}/references" ]; then
-            dest_refs="${cible}/skills/${skill}/references"
-            mkdir -p "${dest_refs}" "${backup_dir}/references"
-            for annexe in "${skill_dir}"/references/*; do
-                nom_annexe="$(basename "$annexe")"
-                cp "$annexe" "${dest_refs}/${nom_annexe}"
-                cp "$annexe" "${backup_dir}/references/${nom_annexe}" 2>/dev/null || true
-                nb_fichiers=$((nb_fichiers + 1))
-                echo "  ${skill}/references/${nom_annexe} : synchronisé"
-            done
-        fi
+        # Annexes root (ex. security-review/cloud-infrastructure-security.md) + references/
+        for annexe in "${skill_dir}"/*; do
+            [ -e "$annexe" ] || continue
+            nom="$(basename "$annexe")"
+            [ "$nom" = "SKILL.md" ] && continue
+            dest_annexe="${cible}/skills/${skill}/${nom}"
+            if [ -e "$dest_annexe" ]; then
+                rm -rf "${backup_dir}/${nom}"
+                cp -r "$dest_annexe" "${backup_dir}/"
+            fi
+            rm -rf "$dest_annexe"
+            cp -r "$annexe" "$dest_annexe"
+            nb_fichiers=$((nb_fichiers + 1))
+            echo "  ${skill}/${nom} : synchronisé"
+        done
     done
 done
 
