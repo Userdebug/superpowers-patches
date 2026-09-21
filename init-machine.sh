@@ -64,15 +64,19 @@ path, personal, upstream = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, encoding='utf-8') as f:
     cfg = json.load(f)
 plugins = cfg.setdefault('plugin', [])
-# Entrée superpowers d'abord, puis personnel (dernier => gagne le bootstrap).
-plugins = [p for p in plugins if p != upstream and p != personal]
-cfg['plugin'] = [upstream, personal]
+# Conserve les autres entrées ; garantit superpowers en tête puis personnel juste après.
+plugins = [p for p in plugins if p != personal]
+if upstream not in plugins:
+    plugins = [upstream] + plugins
+idx = plugins.index(upstream)
+if idx + 1 == len(plugins) or plugins[idx + 1] != personal:
+    plugins.insert(idx + 1, personal)
+cfg['plugin'] = plugins
 tmp = path + '.tmp'
 with open(tmp, 'w', encoding='utf-8') as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write('\n')
 os.replace(tmp, path)
-print('OK')
 PY
             echo "[OK] Plugin personnel déclaré APRÈS superpowers dans ${GLOBAL_CFG}"
         else
