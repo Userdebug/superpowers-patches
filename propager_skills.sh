@@ -21,6 +21,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENTS_SKILLS="${HOME}/.agents/skills"
 
+FORCE=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force) FORCE="${2:-}"; shift 2 ;;
+        *) echo "usage: $0 [--force <skill>]" >&2; exit 1 ;;
+    esac
+done
+
 if [ ! -d "${AGENTS_SKILLS}" ]; then
     mkdir -p "${AGENTS_SKILLS}"
     echo "[OK] Dossier ${AGENTS_SKILLS} créé."
@@ -35,16 +43,34 @@ nb=0
 for src in "${SCRIPT_DIR}"/skills/*/SKILL.md; do
     [ -e "$src" ] || continue
     skill=$(basename "$(dirname "$src")")
-    dest="${AGENTS_SKILLS}/${skill}"
-    if [ -f "${dest}/SKILL.md" ]; then
-        echo "  ${skill}/ : déjà présent (curaté, ignoré — non écrasé)"
+    if [ -n "$FORCE" ] && [ "$skill" != "$FORCE" ]; then
         continue
     fi
-    mkdir -p "$dest"
-    cp -r "$(dirname "$src")"/. "$dest/"
-    echo "  ${skill}/ : copiée vers ${dest}"
-    nb=$((nb + 1))
+    dest="${AGENTS_SKILLS}/${skill}"
+    if [ -f "${dest}/SKILL.md" ]; then
+        if [ -n "$FORCE" ]; then
+            bkp="${HOME}/.agents/skills_backup/$(date +%Y%m%d-%H%M%S)/${skill}"
+            mkdir -p "$bkp"
+            cp -r "${dest}"/. "$bkp/"
+            rm -rf "$dest"
+            cp -r "$(dirname "$src")"/. "$dest/"
+            echo "  ${skill}/ : FORCÉE (curatée → ${bkp})"
+            nb=$((nb + 1))
+        else
+            echo "  ${skill}/ : déjà présent (curaté, ignoré — non écrasé)"
+            continue
+        fi
+    else
+        mkdir -p "$dest"
+        cp -r "$(dirname "$src")"/. "$dest/"
+        echo "  ${skill}/ : copiée vers ${dest}"
+        nb=$((nb + 1))
+    fi
 done
+
+if [ -n "$FORCE" ] && [ "$nb" -eq 0 ]; then
+    echo "AVERTISSEMENT : skill « ${FORCE} » introuvable dans ${SCRIPT_DIR}/skills/." >&2
+fi
 
 echo ""
 echo "Terminé : ${nb} skill(s) propagée(s). Source : ${SCRIPT_DIR}/skills/ → ${AGENTS_SKILLS}/"
