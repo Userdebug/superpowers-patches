@@ -2,6 +2,11 @@
 # test_plugin_loader.sh — test d'intégration loader : les 13 skills du dépôt
 # doivent résoudre vers le miroir PERSONAL (opensource), pas vers le cache
 # du paquet superpowers. Aucun appel modèle ; opencode debug skill suffit.
+#
+# HERMÉTICITÉ : opencode scanne AUSSI ~/.config/opencode/plugins/ (plugins
+# globaux) même quand OPENCODE_CONFIG_DIR pointe ailleurs ; si le plugin
+# personnel y est installé (machine réelle), il polluait le sandbox et l'ordre
+# de poussée changeait (cache gagnait). D'où XDG_CONFIG_HOME isolé par run.
 set -euo pipefail
 PATCH_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
@@ -47,7 +52,7 @@ EOF
     MARKER="marker-variante-b-${ORDER}-$(date +%s)"
     printf '\n\n> %s\n' "$MARKER" >> "$CFG/personal-skills/using-superpowers/SKILL.md"
 
-    OPENCODE_CONFIG_DIR="$CFG" opencode debug skill > "$TMP/out.json" 2> "$TMP/err.log" \
+    OPENCODE_CONFIG_DIR="$CFG" XDG_CONFIG_HOME="$TMP/xdg" opencode debug skill > "$TMP/out.json" 2> "$TMP/err.log" \
         || { cat "$TMP/err.log" >&2; echo "FAIL [${ORDER}]: opencode debug skill a échoué" >&2; exit 1; }
 
     nb=0
