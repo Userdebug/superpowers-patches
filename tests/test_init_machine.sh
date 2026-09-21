@@ -35,9 +35,10 @@ cmp -s "$CFG_DIR/plugins/personal-skills.js" "$PATCH_DIR/plugin/personal-skills.
 cmp -s "$CFG_DIR/commands/capacites.md" "$PATCH_DIR/templates/project/commands/capacites.md" \
     || { echo "FAIL : commande /capacites non conforme au template" >&2; exit 1; }
 
-# Miroir personal-skills propagé.
+# Miroir personal-skills propagé : IDENTIQUE au compte réel du dépôt.
 [ -d "$CFG_DIR/personal-skills/using-superpowers" ] || { echo "FAIL : miroir personal-skills absent (hub manquant)" >&2; exit 1; }
+expected=$(find "$PATCH_DIR/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)
 nb=$(find "$CFG_DIR/personal-skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)
-[ "$nb" -ge 13 ] || { echo "FAIL : miroir incomplet (${nb}/13)" >&2; exit 1; }
+[ "$nb" -eq "$expected" ] || { echo "FAIL : miroir incomplet (${nb}/${expected} skills)" >&2; exit 1; }
 
 echo "test_init_machine : OK"

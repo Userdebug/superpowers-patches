@@ -8,12 +8,12 @@
 #      notre mini-plugin personnel plugin/personal-skills.js installé APRÈS
 #      superpowers dans le tableau "plugin" (ordre = victoire du bootstrap
 #      personnel sur le cache — le loader « dernier écrit gagne »).
-#   2. Propage les skills : miroir opencode ~/.config/opencode/personal-skills/
-#      + ~/.agents/skills/ (autres harnais, curatées préservées).
-#   3. Installe la commande universelle /capacites (~/.config/opencode/commands/) :
+#   2. Installe la commande universelle /capacites (~/.config/opencode/commands/) :
 #      disponible dans CHAQUE projet opencode — avec le glob d'instructions du
 #      triptyque injecté par le mini-plugin, AUCUNE action par projet n'est
 #      nécessaire (le fichier d'état est régénéré dans le projet par /capacites).
+#   3. Propage les skills : miroir opencode ~/.config/opencode/personal-skills/
+#      + ~/.agents/skills/ (autres harnais, curatées préservées).
 #
 # Ensuite, dans un projet : /capacites, puis committer le fichier d'état généré.
 set -euo pipefail
@@ -136,14 +136,12 @@ COMMANDS_DIR="${CONFIG_DIR}/commands"
 mkdir -p "${COMMANDS_DIR}"
 TPL_CMD="${SCRIPT_DIR}/templates/project/commands/capacites.md"
 CAPACITES_CMD="${COMMANDS_DIR}/capacites.md"
-if [ -f "$TPL_CMD" ] && ! cmp -s "$TPL_CMD" "$CAPACITES_CMD"; then
+[ -f "$TPL_CMD" ] || { echo "ERREUR : template de la commande /capacites introuvable (${TPL_CMD})." >&2; exit 1; }
+if cmp -s "$TPL_CMD" "$CAPACITES_CMD"; then
+    echo "[OK] Commande /capacites déjà à jour : ${CAPACITES_CMD}"
+else
     cp "$TPL_CMD" "$CAPACITES_CMD"
     echo "[OK] Commande /capacites installée (globale) : ${CAPACITES_CMD}"
-elif [ ! -f "$CAPACITES_CMD" ]; then
-    echo "ERREUR : template de la commande /capacites introuvable (${TPL_CMD})." >&2
-    exit 1
-else
-    echo "[OK] Commande /capacites déjà à jour : ${CAPACITES_CMD}"
 fi
 # Le glob d'instructions du triptyque est injecté par le mini-plugin
 # (config.instructions) : rien à écrire dans la config du projet.

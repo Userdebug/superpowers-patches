@@ -82,7 +82,9 @@ déclaré APRÈS `superpowers@git+…` dans `"plugin"`. Deux hooks :
      projet de travail** (pas au dossier de config) : le fichier d'état du
      triptyque est donc chargé dans chaque session, sans rien écrire dans le
      projet. Les instructions projet existantes (ex. `AGENTS.md`) sont
-     conservées (concaténation, jamais écrasées).
+     conservées (concaténation, jamais écrasées). La déduplication est sur chaîne
+     exacte : si un projet écrivait le glob préfixé `./`, il ne serait pas fusionné
+     (cas sans risque, l'ancien init-project.sh utilisait la même chaîne exacte).
 2. `experimental.chat.messages.transform` — remplace le bootstrap injecté par le
    texte personnel lu depuis `personal-skills/using-superpowers/SKILL.md` (ou injecte
    son propre texte si `EXTREMELY_IMPORTANT` est absent du premier message).
@@ -110,15 +112,20 @@ git clone https://github.com/Userdebug/superpowers-patches.git
 cd superpowers-patches
 ./init-machine.sh
 # → déclare le plugin superpowers dans ~/.config/opencode/opencode.json(c)
-#   + installe notre mini-plugin personnel APRÈS + lance propager_skills.sh
+#   + installe notre mini-plugin personnel APRÈS
+#   + installe la commande /capacites (universelle)
+#   + lance propager_skills.sh
 ```
 
-`init-machine.sh` fait trois choses :
+`init-machine.sh` fait quatre choses :
 1. s'assure que `superpowers@git+…` est déclaré ;
 2. copie `plugin/personal-skills.js` vers `~/.config/opencode/plugins/` et l'ajoute
    DANS le tableau `"plugin"`, APRÈS superpowers (JSON strict injecté par python3,
    sinon ACTION MANUELLE affichée) ;
-3. lance `propager_skills.sh` (miroir opencode + `~/.agents/skills/`).
+3. copie `templates/project/commands/capacites.md` vers
+   `~/.config/opencode/commands/` (commande `/capacites` universelle, disponible
+   dans chaque projet) ;
+4. lance `propager_skills.sh` (miroir opencode + `~/.agents/skills/`).
 
 Redémarrer OpenCode : les 13 extensions et le hub personnel sont alors
 **automatiquement actifs** (le cache du paquet reste intouché).
