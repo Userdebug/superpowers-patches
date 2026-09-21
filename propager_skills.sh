@@ -49,7 +49,13 @@ for src in "${SCRIPT_DIR}"/skills/*/SKILL.md; do
     dest="${AGENTS_SKILLS}/${skill}"
     if [ -f "${dest}/SKILL.md" ]; then
         if [ -n "$FORCE" ]; then
-            bkp="${HOME}/.agents/skills_backup/$(date +%Y%m%d-%H%M%S)/${skill}"
+            ts="$(date +%Y%m%d-%H%M%S)"
+            i=0
+            suffix=""
+            while [ -e "${HOME}/.agents/skills_backup/${ts}${suffix}/${skill}" ]; do
+                i=$((i + 1)); suffix=".${i}"
+            done
+            bkp="${HOME}/.agents/skills_backup/${ts}${suffix}/${skill}"
             mkdir -p "$bkp"
             cp -r "${dest}"/. "$bkp/"
             rm -rf "$dest"

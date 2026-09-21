@@ -18,7 +18,7 @@ HOME="$TMP/home" "$PATCH_DIR/propager_skills.sh" >/dev/null
 HOME="$TMP/home" "$PATCH_DIR/propager_skills.sh" --force code-refactor >/dev/null
 cmp -s "$PATCH_DIR/skills/code-refactor/SKILL.md" "$AGENTS/code-refactor/SKILL.md" \
   || { echo "FAIL: curatée != patch après --force"; exit 1; }
-bkp="$(ls -d "$TMP"/home/.agents/skills_backup/*/code-refactor 2>/dev/null | head -1)"
+bkp="$(ls -d "$TMP"/home/.agents/skills_backup/*/code-refactor 2>/dev/null | head -1 || true)"
 [ -n "$bkp" ] || { echo "FAIL: backup skills_backup manquant"; exit 1; }
 [ "$(cat "$bkp/SKILL.md")" = "OLD-CURATED" ] \
   || { echo "FAIL: backup ne contient pas l'ancienne curatée"; exit 1; }
