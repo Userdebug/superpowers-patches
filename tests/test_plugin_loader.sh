@@ -13,7 +13,11 @@ CFG="$TMP/cfg"
 mkdir -p "$CFG/plugins" "$CFG/personal-skills"
 cp "$PATCH_DIR/plugin/personal-skills.js" "$CFG/plugins/"
 
-cat > "$CFG/opencode.jsonc" <<EOF
+# Le plugin personnel doit gagner quelle que soit l'ordre de déclaration
+# (invariant contrôlé empiriquement sur opencode 1.18.x).
+for ORDER in superpowers-first personal-first; do
+    if [ "$ORDER" = superpowers-first ]; then
+        cat > "$CFG/opencode.jsonc" <<EOF
 {
   "\$schema": "https://opencode.ai/config.json",
   "plugin": [
@@ -22,30 +26,48 @@ cat > "$CFG/opencode.jsonc" <<EOF
   ]
 }
 EOF
+    else
+        cat > "$CFG/opencode.jsonc" <<EOF
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "$CFG/plugins/personal-skills.js",
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ]
+}
+EOF
+    fi
 
-for skill in "$PATCH_DIR"/skills/*/; do
-    cp -r "$skill" "$CFG/personal-skills/"
-done
+    for skill in "$PATCH_DIR"/skills/*/; do
+        cp -r "$skill" "$CFG/personal-skills/"
+    done
 
-OPENCODE_CONFIG_DIR="$CFG" opencode debug skill > "$TMP/out.json" 2> "$TMP/err.log" \
-    || { cat "$TMP/err.log" >&2; echo "FAIL: opencode debug skill a échoué" >&2; exit 1; }
+    # Marqueur unique injecté DANS la copie miroir du hub : prouve que le
+    # contenu chargé vient de PERSONAL (et non du cache superpowers, identique).
+    MARKER="marker-variante-b-${ORDER}-$(date +%s)"
+    printf '\n\n> %s\n' "$MARKER" >> "$CFG/personal-skills/using-superpowers/SKILL.md"
 
-nb=0
-for skill in "$PATCH_DIR"/skills/*/; do
-    n="$(basename "$skill")"
-    if ! grep -q "\"location\".*personal-skills/${n}/SKILL.md" "$TMP/out.json"; then
-        echo "FAIL: ${n} ne résout PAS vers PERSONAL (cache? autre?)" >&2
-        grep "\"name\": \"${n}\"" "$TMP/out.json" || true
+    OPENCODE_CONFIG_DIR="$CFG" opencode debug skill > "$TMP/out.json" 2> "$TMP/err.log" \
+        || { cat "$TMP/err.log" >&2; echo "FAIL [${ORDER}]: opencode debug skill a échoué" >&2; exit 1; }
+
+    nb=0
+    for skill in "$PATCH_DIR"/skills/*/; do
+        n="$(basename "$skill")"
+        if ! grep -q "\"location\".*personal-skills/${n}/SKILL.md" "$TMP/out.json"; then
+            echo "FAIL [${ORDER}]: ${n} ne résout PAS vers PERSONAL (cache? autre?)" >&2
+            grep "\"name\": \"${n}\"" "$TMP/out.json" || true
+            exit 1
+        fi
+        nb=$((nb + 1))
+    done
+
+    # Le hub using-superpowers chargé doit être NOTRE version curatée : le
+    # marqueur unique présent UNIQUEMENT dans la copie miroir.
+    if ! grep -q "$MARKER" "$TMP/out.json"; then
+        echo "FAIL [${ORDER}]: using-superpowers ne contient pas notre marqueur curaté" >&2
         exit 1
     fi
-    nb=$((nb + 1))
+    echo "  [${ORDER}] : OK (${nb} skills → personal-skills, hub = version personnelle curatée)"
 done
 
-# Le hub using-superpowers chargé doit être NOTRE version curatée (marqueur
-# « Semantic Tool Mapping (capability-first) »), pas le SKILL.md du cache.
-if ! grep -q "Semantic Tool Mapping (capability-first)" "$TMP/out.json"; then
-    echo "FAIL: using-superpowers ne contient pas notre marqueur curaté" >&2
-    exit 1
-fi
-
-echo "test_plugin_loader : OK (${nb} skills → personal-skills, hub = version personnelle curatée)"
+echo "test_plugin_loader : OK"

@@ -53,17 +53,42 @@ else
 fi
 
 # Déclare le plugin personnel APRÈS superpowers dans le tableau "plugin".
-# opencode.json (JSON strict) : injecté par python3 ; .jsonc (commentaires) :
-# approche textuelle — sinon ACTION MANUELLE.
-case "${GLOBAL_CFG}" in
-    *.json)
-        if command -v python3 >/dev/null 2>&1 && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "${GLOBAL_CFG}" >/dev/null 2>&1; then
-            python3 - "${GLOBAL_CFG}" "${PERSONAL_PLUGIN}" "${PLUGIN_DECL}" <<'PY'
-import json, sys, os
+# opencode.json / opencode.jsonc (commentaires) : injection JSONC par python3,
+# sinon ACTION MANUELLE (script interrompu — la déclaration est obligatoire).
+PY_INJECT=$(cat <<'PY'
+import json, sys, os, re
+
+def strip_jsonc(text):
+    # Retire les commentaires // et /* */ en dehors des chaînes (JSONC pur).
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == '\\' and i + 1 < n:
+                out.append(text[i + 1]); i += 2; continue
+            if c == '"': in_str = False
+            i += 1; continue
+        if c == '"':
+            in_str = True; out.append(c); i += 1; continue
+        if text.startswith('//', i):
+            j = text.find('\n', i)
+            i = j if j != -1 else n; continue
+        if text.startswith('/*', i):
+            j = text.find('*/', i + 2)
+            i = (j + 2) if j != -1 else n; continue
+        out.append(c); i += 1
+    return ''.join(out)
+
 path, personal, upstream = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(path, encoding='utf-8') as f:
-    cfg = json.load(f)
-plugins = cfg.setdefault('plugin', [])
+raw = open(path, encoding='utf-8').read()
+try:
+    cfg = json.loads(strip_jsonc(raw))
+except Exception as e:
+    print(f"PARSE_ERR:{e}"); sys.exit(2)
+plugins = cfg.get('plugin')
+if plugins is None:
+    plugins = []
 # Conserve les autres entrées ; garantit superpowers en tête puis personnel juste après.
 plugins = [p for p in plugins if p != personal]
 if upstream not in plugins:
@@ -78,25 +103,26 @@ with open(tmp, 'w', encoding='utf-8') as f:
     f.write('\n')
 os.replace(tmp, path)
 PY
+)
+
+if command -v python3 >/dev/null 2>&1; then
+    if out=$(python3 -c "$PY_INJECT" "$GLOBAL_CFG" "$PERSONAL_PLUGIN" "$PLUGIN_DECL" 2>&1); then
+        if [ -z "$out" ]; then
             echo "[OK] Plugin personnel déclaré APRÈS superpowers dans ${GLOBAL_CFG}"
         else
-            echo "ACTION MANUELLE : ajoute \"${PERSONAL_PLUGIN}\" DANS le tableau plugin de ${GLOBAL_CFG}, APRÈS l'entrée superpowers." >&2
+            echo "ERREUR python3 : ${out}" >&2
             exit 1
         fi
-        ;;
-    *.jsonc)
-        if grep -q "${PERSONAL_PLUGIN}" "$GLOBAL_CFG"; then
-            echo "[OK] Plugin personnel déjà déclaré dans ${GLOBAL_CFG}"
-        else
-            echo "ACTION MANUELLE : ajoute \"${PERSONAL_PLUGIN}\" dans le tableau \"plugin\" de ${GLOBAL_CFG}, APRÈS l'entrée superpowers." >&2
-            exit 1
-        fi
-        ;;
-    *)
-        echo "ACTION MANUELLE : ajoute \"${PERSONAL_PLUGIN}\" dans le tableau \"plugin\" de ${GLOBAL_CFG}." >&2
+    else
+        echo "ERREUR : ${out}" >&2
+        echo "ACTION MANUELLE : ajoute \"${PERSONAL_PLUGIN}\" DANS le tableau \"plugin\" de ${GLOBAL_CFG}, APRÈS l'entrée superpowers, puis relance le script." >&2
         exit 1
-        ;;
-esac
+    fi
+else
+    echo "ERREUR : python3 absent." >&2
+    echo "ACTION MANUELLE : ajoute \"${PERSONAL_PLUGIN}\" DANS le tableau \"plugin\" de ${GLOBAL_CFG}, APRÈS l'entrée superpowers." >&2
+    exit 1
+fi
 
 # --- 3. Propagation des skills : miroir opencode + ~/.agents/skills/ ---
 "${SCRIPT_DIR}/propager_skills.sh"

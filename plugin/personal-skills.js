@@ -29,11 +29,15 @@ export const buildBootstrapContent = (body, toolMapping) =>
   `${toolMapping}\n` +
   `</EXTREMELY_IMPORTANT>`;
 
+let bootstrapCache = null;
+
 const readBootstrap = (personalDir) => {
+  if (bootstrapCache) return bootstrapCache;
   const hub = path.join(personalDir, 'using-superpowers', 'SKILL.md');
   if (!fs.existsSync(hub)) return null;
   const body = extractAndStripFrontmatter(fs.readFileSync(hub, 'utf8'));
-  return buildBootstrapContent(body, TOOL_MAPPING);
+  bootstrapCache = buildBootstrapContent(body, TOOL_MAPPING);
+  return bootstrapCache;
 };
 
 export const applyBootstrap = (messages, bootstrap) => {

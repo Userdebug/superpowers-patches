@@ -46,12 +46,17 @@ OpenCode qu'après redémarrage (l'inventaire est établi au démarrage).
 personnel tire les extensions du miroir, qui gagne sur le cache — et une mise à jour du
 paquet upstream n'exige donc plus aucune ré-injection.
 
-Le loader opencode est « dernier écrit gagne ». `superpowers.js` pousse le dossier de
-skills du cache en DERNIÈRE position de `skills.paths` (hook `config()`), donc le cache
-gagne n'importe quel dossier scanné avant. Notre mini-plugin, déclaré **après**
-superpowers dans le tableau `plugin` d'`opencode.json(c)`, pousse le miroir personnel
-**encore après** → les 13 collisions se résolvent vers la version PERSONNELLE
-(vérifié : `opencode debug skill`).
+Le loader opencode est « dernier écrit gagne » : parmi plusieurs définitions **du même
+skill** (même `name` dans le frontmatter), la source dont le chemin arrive le plus tard
+dans `skills.paths` l'emporte. `superpowers.js` pousse le dossier skills du cache en
+DERNIÈRE position de `skills.paths` (hook `config()`). Notre mini-plugin, déclaré dans le
+tableau `plugin` d'`opencode.json(c)`, pousse le miroir personnel après → les 13
+collisions se résolvent vers la version PERSONNELLE.
+
+> Le test d'intégration (`tests/test_plugin_loader.sh`) épingle cet invariant sur
+> opencode 1.18.x : la victoire personnelle est vérifiée dans les **deux** ordres de
+> déclaration (`superpowers-first` et `personal-first`). L'ordre « superpowers puis
+> personnel » reste la configuration supportée et documentée par `init-machine.sh`.
 
 | Couche | Rôle | Écrasée par |
 |---|---|---|
@@ -61,8 +66,8 @@ superpowers dans le tableau `plugin` d'`opencode.json(c)`, pousse le miroir pers
 
 **Le bootstrap de session** (le bloc `<EXTREMELY_IMPORTANT>`“You have superpowers”)
 est injecté par `superpowers.js` depuis SON cache ; notre plugin `personal-skills.js`
-tourne après et **remplace ce texte** par la version du hub miroir (`using-superpowers`).
-Même ordre de victoire : les deux hooks suivent l'ordre du tableau `plugin`.
+tourne et **remplace ce texte** par la version du hub miroir (`using-superpowers`).
+Même invariant que le loader : vérifié dans les deux ordres de déclaration.
 
 ### Le mini-plugin `plugin/personal-skills.js`
 
@@ -76,7 +81,14 @@ déclaré APRÈS `superpowers@git+…` dans `"plugin"`. Deux hooks :
    son propre texte si `EXTREMELY_IMPORTANT` est absent du premier message).
 
 Tests : `tests/plugin-unit.test.mjs` (unitaires Node), `tests/test_plugin_loader.sh`
-(intégration loader : 13 → miroir). Le plugin est sans dépendance (`path`/`fs`/`os`).
+(intégration loader : 13 → miroir, dans les deux ordres de déclaration). Le plugin est
+sans dépendance (`path`/`fs`/`os`).
+
+> **Note `OPENCODE_CONFIG_DIR`** : le plugin résout son miroir via `OPENCODE_CONFIG_DIR`
+> s'il est défini (sinon `~/.config/opencode`), comme `superpowers.js` ; `propager_skills.sh`
+> vise `$HOME/.config/opencode/personal-skills` (environnement réel). Sous un
+> `OPENCODE_CONFIG_DIR` personnalisé, le miroir doit être déployé dans CE répertoire —
+> comme le fait le test d'intégration.
 
 ## Installation — init-machine + init-project
 
