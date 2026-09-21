@@ -3,7 +3,7 @@
 #
 # Deux sources, deux rôles : la session OpenCode charge les skills depuis le
 # CACHE du plugin superpowers (~/.cache/opencode/packages/superpowers@*/…),
-# MAINtenu par reinjecter.sh — PAS depuis ~/.agents/skills/. Le dossier
+# maintenu par reinjecter.sh — PAS depuis ~/.agents/skills/. Le dossier
 # ~/.agents/skills/ sert les AUTRES harnais (Claude Code, Cursor, …).
 # Ce script y propage donc les skills ajoutées (ui-governance, security-review,
 # coding-standards, …) pour qu'elles restent disponibles sur ces autres harnais

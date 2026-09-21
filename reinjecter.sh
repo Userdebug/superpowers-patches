@@ -3,7 +3,8 @@
 # cache opencode, après chaque mise à jour du paquet superpowers.
 #
 # - Détecte automatiquement tout dossier ~/.cache/opencode/packages/superpowers@*/node_modules/superpowers
-# - Sauvegarde l'état courant du cache dans _backup_cache/<horodatage>/ avant écrasement
+# - Sauvegarde l'état courant du cache dans ${BACKUP_ROOT:-_backup_cache}/<horodatage>/ avant écrasement
+#   (BACKUP_ROOT surchargeable, ex. pour isoler les backups hors du dépôt)
 # - Idempotent : relançable sans risque
 set -euo pipefail
 
