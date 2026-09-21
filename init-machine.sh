@@ -10,8 +10,12 @@
 #      personnel sur le cache — le loader « dernier écrit gagne »).
 #   2. Propage les skills : miroir opencode ~/.config/opencode/personal-skills/
 #      + ~/.agents/skills/ (autres harnais, curatées préservées).
+#   3. Installe la commande universelle /capacites (~/.config/opencode/commands/) :
+#      disponible dans CHAQUE projet opencode — avec le glob d'instructions du
+#      triptyque injecté par le mini-plugin, AUCUNE action par projet n'est
+#      nécessaire (le fichier d'état est régénéré dans le projet par /capacites).
 #
-# Ensuite, pour CHAQUE projet : ./init-project.sh /chemin/du/projet
+# Ensuite, dans un projet : /capacites, puis committer le fichier d'état généré.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -124,10 +128,30 @@ else
     exit 1
 fi
 
-# --- 3. Propagation des skills : miroir opencode + ~/.agents/skills/ ---
+# --- 3. Commande /capacites universelle (config universelle — option B) ---
+# Installée au niveau MACHINE : disponible dans chaque projet opencode, sans
+# action par projet. La commande sonde la session courante et régénère
+# .opencode/instructions/capacites-outils.md dans le répertoire courant.
+COMMANDS_DIR="${CONFIG_DIR}/commands"
+mkdir -p "${COMMANDS_DIR}"
+TPL_CMD="${SCRIPT_DIR}/templates/project/commands/capacites.md"
+CAPACITES_CMD="${COMMANDS_DIR}/capacites.md"
+if [ -f "$TPL_CMD" ] && ! cmp -s "$TPL_CMD" "$CAPACITES_CMD"; then
+    cp "$TPL_CMD" "$CAPACITES_CMD"
+    echo "[OK] Commande /capacites installée (globale) : ${CAPACITES_CMD}"
+elif [ ! -f "$CAPACITES_CMD" ]; then
+    echo "ERREUR : template de la commande /capacites introuvable (${TPL_CMD})." >&2
+    exit 1
+else
+    echo "[OK] Commande /capacites déjà à jour : ${CAPACITES_CMD}"
+fi
+# Le glob d'instructions du triptyque est injecté par le mini-plugin
+# (config.instructions) : rien à écrire dans la config du projet.
+
+# --- 4. Propagation des skills : miroir opencode + ~/.agents/skills/ ---
 "${SCRIPT_DIR}/propager_skills.sh"
 
 echo ""
 echo "Machine initialisée. Étapes suivantes :"
 echo "  1. Redémarre OpenCode (plugins chargés au démarrage ; le miroir personal-skills y est poussé en dernière position)"
-echo "  2. Par projet : ${SCRIPT_DIR}/init-project.sh /chemin/du/projet"
+echo "  2. Dans CHAQUE projet (config universelle) : tape /capacites, puis committe le fichier d'état généré (.opencode/instructions/)"

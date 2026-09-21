@@ -57,12 +57,17 @@ export const PersonalSkillsPlugin = async () => {
     ? path.resolve(process.env.OPENCODE_CONFIG_DIR.trim())
     : path.join(os.homedir(), '.config', 'opencode');
   const personalSkillsDir = path.join(configDir, 'personal-skills');
+  const instructionGlob = '.opencode/instructions/*.md';
   return {
     config: async (config) => {
       config.skills = config.skills || {};
       config.skills.paths = config.skills.paths || [];
       if (!config.skills.paths.includes(personalSkillsDir)) {
         config.skills.paths.push(personalSkillsDir);
+      }
+      config.instructions = config.instructions || [];
+      if (!config.instructions.includes(instructionGlob)) {
+        config.instructions.push(instructionGlob);
       }
     },
     'experimental.chat.messages.transform': async (_input, output) => {

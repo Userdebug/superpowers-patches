@@ -5,6 +5,7 @@ import {
   extractAndStripFrontmatter,
   buildBootstrapContent,
   applyBootstrap,
+  PersonalSkillsPlugin,
 } from '../plugin/personal-skills.js';
 
 test('extractAndStripFrontmatter retire le frontmatter, garde le corps', () => {
@@ -49,4 +50,31 @@ test('applyBootstrap ignore si aucun message utilisateur', () => {
   const messages = [{ info: { role: 'assistant' }, parts: [{ type: 'text', text: 'x' }] }];
   applyBootstrap(messages, 'NEW');
   assert.equal(messages[0].parts.length, 1);
+});
+
+const INSTRUCTION_GLOB = '.opencode/instructions/*.md';
+
+const configHook = async (config) => {
+  const plugin = await PersonalSkillsPlugin();
+  const hooks = plugin.config;
+  return hooks(config);
+};
+
+test('config() injecte le glob instructions quand aucune instruction définie', async () => {
+  const config = {};
+  await configHook(config);
+  assert.deepEqual(config.instructions, [INSTRUCTION_GLOB]);
+});
+
+test('config() ajoute le glob sans écraser les instructions projet existantes', async () => {
+  const config = { instructions: ['AGENTS.md'] };
+  await configHook(config);
+  assert.deepEqual(config.instructions, ['AGENTS.md', INSTRUCTION_GLOB]);
+});
+
+test('config() est idempotent : le glob n`est jamais dupliqué', async () => {
+  const config = { instructions: [INSTRUCTION_GLOB] };
+  await configHook(config);
+  await configHook(config);
+  assert.deepEqual(config.instructions, [INSTRUCTION_GLOB]);
 });
