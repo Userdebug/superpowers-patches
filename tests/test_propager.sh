@@ -9,10 +9,12 @@ mkdir -p "$AGENTS/code-refactor" "$AGENTS/ui-governance"
 
 echo "OLD-CURATED" > "$AGENTS/code-refactor/SKILL.md"
 
-# (a) Sans --force : la curatée n'est PAS écrasée
-HOME="$TMP/home" "$PATCH_DIR/propager_skills.sh" >/dev/null
+# (a) Sans --force : la curatée n'est PAS écrasée, et la divergence est signalée
+a_out="$(HOME="$TMP/home" "$PATCH_DIR/propager_skills.sh" 2>&1)"
 [ "$(cat "$AGENTS/code-refactor/SKILL.md")" = "OLD-CURATED" ] \
   || { echo "FAIL: curatée écrasée sans --force"; exit 1; }
+grep -q "PRÉSERVÉE mais DIFFÉRENTE" <<<"$a_out" \
+  || { echo "FAIL: divergence ~/.agents non signalée (opencode 2 lit ce dossier)"; exit 1; }
 
 # (a') Re-run sans --force : toujours préservée
 HOME="$TMP/home" "$PATCH_DIR/propager_skills.sh" >/dev/null

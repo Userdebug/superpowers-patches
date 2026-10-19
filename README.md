@@ -12,10 +12,12 @@ de Superpowers dans OpenCode.
   du paquet upstream).
 - Surcharge des skills existantes par des versions personnelles étendues/améliorées.
 - Assure que ces skills sont bien chargées par OpenCode à chaque session, grâce à un
-  plugin qui les déclare en dernière position dans `skills.paths` (le loader OpenCode
+  plugin qui les enregistre après superpowers (OpenCode 2 : `ctx.skill.transform`,
+  remplacement par id ; OpenCode 1 : dernière position dans `skills.paths`, loader
   « dernier écrit gagne ») — sans jamais modifier le cache du paquet superpowers.
 - Remplace le bootstrap de session injecté par superpowers par la version personnelle
-  du hub `using-superpowers`.
+  du hub `using-superpowers` (OpenCode 2 : hook `context` ; OpenCode 1 :
+  `experimental.chat.messages.transform`), avec le mapping d'outils adapté (shell/subagent/patch en v2).
 
 ## Installation
 
@@ -31,7 +33,7 @@ Puis redémarrer OpenCode.
 |---|---|
 | `init-machine.sh` | Configure une machine : déclare le plugin superpowers, installe le mini-plugin personnel après, ajoute la commande `/capacites` |
 | `propager_skills.sh` | Copie les skills du dépôt vers les répertoires de skills locaux (`~/.config/opencode/personal-skills/`, `~/.agents/skills/`) |
-| `plugin/personal-skills.js` | Mini-plugin OpenCode : injecte le miroir personnel dans `skills.paths` et remplace le bootstrap de session |
+| `plugin/personal-skills.js` | Mini-plugin OpenCode dual V1/V2 : enregistre le miroir personnel (`skills.paths` en V1, `skill.transform` en V2) et remplace le bootstrap de session (`messages.transform` en V1, hook `context` en V2) |
 
 ## Contenu du dépôt
 

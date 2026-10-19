@@ -61,7 +61,14 @@ for src in "${SCRIPT_DIR}"/skills/*/SKILL.md; do
             echo "  ${skill}/ : FORCÉE (curatée → ${bkp})"
             nb=$((nb + 1))
         else
-            echo "  ${skill}/ : déjà présent (curaté, ignoré — non écrasé)"
+            # opencode 2 découvre nativement ~/.agents/skills : une curatée
+            # divergente y sert une version périmée des skills partagées. On ne
+            # l'écrase pas (politique autres harnais) mais on signale l'écart.
+            if ! cmp -s "$src" "${dest}/SKILL.md"; then
+                echo "  ${skill}/ : PRÉSERVÉE mais DIFFÉRENTE du patch — opencode 2 lit ~/.agents/skills, resynchroniser : $0 --force ${skill}"
+            else
+                echo "  ${skill}/ : déjà présent (curatée identique, ignorée)"
+            fi
             continue
         fi
     else
