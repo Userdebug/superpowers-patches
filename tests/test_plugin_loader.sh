@@ -14,10 +14,19 @@
 # L'invariant réel est « la version servie == version du dépôt » (ce test
 # attrape donc aussi un ~/.agents/skills non resynchronisé par propager).
 #
-# HERMÉTICITÉ : XDG_CONFIG_HOME isolé (le scan global ~/.config/opencode/
-# plugins/ ne pollue pas le sandbox) ; le cache ~/.cache/opencode reste réel
-# pour résoudre superpowers hors-ligne ; ~/.agents/skills reste réel (c'est
-# la machine cible — voir ci-dessus).
+# HERMÉTICITÉ : XDG_CONFIG_HOME, XDG_DATA_HOME et XDG_STATE_HOME sont isolés.
+# Sans XDG_DATA_HOME isolé, le sandbox partage le opencode.db, les snapshots
+# et le log de l'hôte ; sans XDG_STATE_HOME isolé, il enregistre son service
+# et ses verrous chez l'hôte. Le cache ~/.cache/opencode reste réel pour
+# résoudre superpowers hors-ligne ; ~/.agents/skills reste réel (c'est la
+# machine cible — voir ci-dessus).
+#
+# PAS de `--service` : ce mode (lifecycle non nul) lance au boot
+# resumeSuspendedSessions(), qui suppose orphelines les claims d'exécution de
+# la base. Avec une base partagée, il « reprenait » la session de l'hôte en
+# cours et injectait « The server restarted while you were working » en
+# annulant le job shell — d'où les redémarrages observés. Un serveur simple
+# (sans lifecycle) ne sweepe jamais.
 set -euo pipefail
 PATCH_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
@@ -68,23 +77,30 @@ grep -q '\.opencode/instructions/\*\.md' "$CFG/opencode.jsonc" \
 # location bootés au premier hit API, plugins activés ~2-3 s après) : on
 # poll jusqu'à ce que les deux plugins soient actifs et les skills présents.
 PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')"
+# Mot de passe connu d'avance : fourni via OPENCODE_PASSWORD (le mode `serve`
+# simple n'écrit pas service.json, contrairement à `--service`).
+PW="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 OPENCODE_CONFIG_DIR="$CFG" XDG_CONFIG_HOME="$TMP/xdg" \
-    opencode serve --hostname 127.0.0.1 --port "$PORT" --service > "$TMP/serve.log" 2>&1 &
+    XDG_DATA_HOME="$TMP/data" XDG_STATE_HOME="$TMP/state" \
+    OPENCODE_PASSWORD="$PW" \
+    opencode serve --hostname 127.0.0.1 --port "$PORT" > "$TMP/serve.log" 2>&1 &
 SERVE_PID=$!
 
-PW=""
+UP=""
 for _ in $(seq 1 60); do
-    if [ -f "$CFG/service.json" ]; then
-        PW="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["password"])' "$CFG/service.json" 2>/dev/null || true)"
-    fi
-    if [ -n "$PW" ] && curl -s -m 2 -u "opencode:$PW" "http://127.0.0.1:$PORT/openapi.json" -o /dev/null; then
+    if curl -s -m 2 -u "opencode:$PW" "http://127.0.0.1:$PORT/openapi.json" -o /dev/null; then
+        UP=1
         break
     fi
     kill -0 "$SERVE_PID" 2>/dev/null || { cat "$TMP/serve.log" >&2; echo "FAIL : opencode serve est mort au démarrage" >&2; exit 1; }
-    PW=""
     sleep 0.5
 done
-[ -n "$PW" ] || { cat "$TMP/serve.log" >&2; echo "FAIL : serveur sandbox non prêt (password/API)" >&2; exit 1; }
+[ -n "$UP" ] || { cat "$TMP/serve.log" >&2; echo "FAIL : serveur sandbox non prêt (API)" >&2; exit 1; }
+
+# Garde-fou d'isolation : data et state sont bien privés au sandbox. Une
+# régression ici (XDG non isolé) réintroduit le partage de la base hôte.
+[ -d "$TMP/data/opencode" ] && [ -d "$TMP/state/opencode" ] \
+    || { echo "FAIL : XDG_DATA_HOME/XDG_STATE_HOME non isolés" >&2; exit 1; }
 
 READY=""
 for _ in $(seq 1 120); do
@@ -106,6 +122,10 @@ PY
     sleep 0.5
 done
 [ -n "$READY" ] || { cat "$TMP/serve.log" >&2; echo "FAIL : plugins/skills non chargés dans le serveur sandbox (timeout)" >&2; exit 1; }
+
+# Les hits API ont ouvert la base : elle doit être la base PRIVÉE du sandbox.
+[ -f "$TMP/data/opencode/opencode.db" ] \
+    || { echo "FAIL : le sandbox n'utilise pas sa propre base (partage de la base hôte)" >&2; exit 1; }
 
 curl -s -m 10 -u "opencode:$PW" "http://127.0.0.1:$PORT/api/config" > "$TMP/config.json" \
     || { echo "FAIL : /api/config a échoué" >&2; exit 1; }
