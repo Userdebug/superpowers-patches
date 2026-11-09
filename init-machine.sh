@@ -24,7 +24,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${HOME}/.config/opencode"
-PLUGIN_DECL='superpowers@git+https://github.com/obra/superpowers.git#v7.0.0'
+PLUGIN_DECL='superpowers@git+https://github.com/obra/superpowers.git#v7.0.2'
 INSTRUCTION_GLOB='.opencode/instructions/*.md'
 PLUGINS_DIR="${CONFIG_DIR}/plugins"
 PERSONAL_PLUGIN="${PLUGINS_DIR}/personal-skills.js"

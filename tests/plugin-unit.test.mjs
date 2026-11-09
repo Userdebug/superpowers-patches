@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   extractAndStripFrontmatter,
   buildBootstrapContent,
+  BOOTSTRAP_MARKER,
   applyBootstrap,
   applyBootstrapV2,
   parseSkillFrontmatter,
@@ -33,11 +34,22 @@ test('buildBootstrapContent enveloppe le corps et intègre le mapping', () => {
 test('applyBootstrap remplace un bootstrap existant', () => {
   const messages = [{
     info: { role: 'user' },
-    parts: [{ type: 'text', text: 'old EXTREMELY_IMPORTANT x' }],
+    parts: [{ type: 'text', text: `${BOOTSTRAP_MARKER} superpowers` }],
   }];
   applyBootstrap(messages, 'NEW');
   assert.equal(messages[0].parts.length, 1);
-  assert.ok(messages[0].parts[0].text.includes('NEW'));
+  assert.equal(messages[0].parts[0].text, 'NEW');
+});
+
+test('applyBootstrap ne confond pas une simple mention avec le bootstrap (#2197)', () => {
+  const messages = [{
+    info: { role: 'user' },
+    parts: [{ type: 'text', text: 'is there an EXTREMELY_IMPORTANT block in your context?' }],
+  }];
+  applyBootstrap(messages, 'NEW');
+  assert.equal(messages[0].parts.length, 2);
+  assert.equal(messages[0].parts[0].text, 'NEW');
+  assert.equal(messages[0].parts[1].text, 'is there an EXTREMELY_IMPORTANT block in your context?');
 });
 
 test('applyBootstrap injecte si aucun bootstrap présent', () => {
@@ -127,16 +139,32 @@ test('V2_TOOL_MAPPING nomme les outils v2 (shell/subagent/patch), pas v1', () =>
   assert.ok(!V2_TOOL_MAPPING.includes('→ `apply_patch`'));
 });
 
+test('V2_TOOL_MAPPING prescrit les ids de skill nus (v7.0.2, #2583)', () => {
+  assert.ok(V2_TOOL_MAPPING.includes('Skill ids are bare names'));
+  assert.ok(V2_TOOL_MAPPING.includes('id: "brainstorming"'));
+});
+
 // --- V2 : applyBootstrapV2 ---------------------------------------------------
 
 test('applyBootstrapV2 remplace un bootstrap existant (notre version gagne)', () => {
   const messages = [{
     role: 'user',
-    content: [{ type: 'text', text: 'old EXTREMELY_IMPORTANT superpowers' }],
+    content: [{ type: 'text', text: `${BOOTSTRAP_MARKER} superpowers` }],
   }];
   applyBootstrapV2(messages, 'NEW');
   assert.equal(messages[0].content.length, 1);
   assert.equal(messages[0].content[0].text, 'NEW');
+});
+
+test('applyBootstrapV2 ne confond pas une simple mention avec le bootstrap (#2197)', () => {
+  const messages = [{
+    role: 'user',
+    content: [{ type: 'text', text: 'que contient le bloc EXTREMELY_IMPORTANT ?' }],
+  }];
+  applyBootstrapV2(messages, 'NEW');
+  assert.equal(messages[0].content.length, 2);
+  assert.equal(messages[0].content[0].text, 'NEW');
+  assert.equal(messages[0].content[1].text, 'que contient le bloc EXTREMELY_IMPORTANT ?');
 });
 
 test('applyBootstrapV2 insère en tête si aucun bootstrap présent', () => {
@@ -231,7 +259,7 @@ test('setup() garde V1 : ctx sans domaines skill/session ⇒ retour silencieux',
   assert.equal(hookCalls, 0);
 });
 
-test('setup() V2 : enregistre les skills du miroir et le hook context', async () => {
+test('setup() V2 : enregistre les skills du miroir et les hooks context/compaction/generate', async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
@@ -267,20 +295,26 @@ test('setup() V2 : enregistre les skills du miroir et le hook context', async ()
     assert.ok(hub.path.endsWith(path.join('using-superpowers', 'SKILL.md')));
     assert.ok(added.some((s) => s.id === 'other-skill'));
 
-    // 2. Hook context enregistré.
-    assert.equal(typeof hooks.context, 'function');
+    // 2. Les trois hooks de requête OpenCode 2 sont enregistrés (v7.0.2).
+    for (const hookName of ['context', 'compaction', 'generate']) {
+      assert.equal(typeof hooks[hookName], 'function', `${hookName} doit être enregistré`);
+    }
 
-    // 3. Remplacement du bootstrap superpowers par NOTRE version (mapping V2).
-    const messages = [{
-      role: 'user',
-      content: [{ type: 'text', text: 'EXTREMELY_IMPORTANT bootstrap superpowers ancien' }],
-    }];
-    await hooks.context({ messages, sessionID: 'ses_v2_top' });
-    const text = messages[0].content[0].text;
-    assert.ok(text.startsWith('<EXTREMELY_IMPORTANT>'));
-    assert.ok(text.includes('CORPS-DU-HUB'), 'notre hub curaté doit remplacer le leur');
-    assert.ok(text.includes('→ `shell`'), 'le mapping V2 doit être présent');
-    assert.ok(text.includes('→ `subagent`'));
+    // 3. Remplacement du bootstrap superpowers par NOTRE version (mapping V2),
+    //    sur chacune des trois formes de requête.
+    for (const hookName of ['context', 'compaction', 'generate']) {
+      const messages = [{
+        role: 'user',
+        content: [{ type: 'text', text: `${BOOTSTRAP_MARKER} superpowers ancien` }],
+      }];
+      await hooks[hookName]({ messages, sessionID: `ses_v2_top_${hookName}` });
+      const text = messages[0].content[0].text;
+      assert.ok(text.startsWith(BOOTSTRAP_MARKER));
+      assert.ok(text.includes('CORPS-DU-HUB'), `notre hub curaté doit remplacer le leur (${hookName})`);
+      assert.ok(text.includes('→ `shell`'), `le mapping V2 doit être présent (${hookName})`);
+      assert.ok(text.includes('→ `subagent`'));
+      assert.ok(text.includes('Skill ids are bare names'));
+    }
 
     // 4. Session top-level sans bootstrap ⇒ insertion en tête.
     const fresh = [{ role: 'user', content: [{ type: 'text', text: 'bonjour' }] }];

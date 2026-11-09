@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 /**
- * Plugin personnel dual V1/V2 (miroir du pattern obra/superpowers v7).
+ * Plugin personnel dual V1/V2 (miroir du pattern obra/superpowers v7.0.2).
  *
  * V1 (OpenCode 1.x) : export nommé PersonalSkillsPlugin — hook config
  *   (skills.paths + glob d'instructions) + experimental.chat.messages.transform
@@ -11,7 +11,8 @@ import os from 'node:os';
  * V2 (OpenCode 2.x) : default export { id, server, setup } — setup() enregistre
  *   les skills via ctx.skill.transform() (après superpowers ⇒ nos versions
  *   gagnent, Map.set remplace à id identique) et injecte le bootstrap via
- *   ctx.session.hook("context") avec le mapping d'outils V2.
+ *   ctx.session.hook sur context/compaction/generate (les trois formes de
+ *   requête d'OpenCode 2) avec le mapping d'outils V2.
  *
  * Le chemin V1 (server) reste inchangé pour garantir le rollback.
  */
@@ -59,7 +60,7 @@ const TOOL_MAPPING = `**Tool Mapping for OpenCode:**
 When skills request actions, substitute OpenCode equivalents:
 - Create or update todos → \`todowrite\`
 - \`Subagent (general-purpose):\` → \`task\` with \`subagent_type: "general"\`
-- Invoke a skill → OpenCode's native \`skill\` tool
+- Invoke a skill → OpenCode's native \`skill\` tool. Skill ids are bare names, so drop the \`superpowers:\` prefix skills use when they name each other (\`superpowers:brainstorming\` → \`skill\` with \`name: "brainstorming"\`)
 - Read files → \`read\`
 - Create, edit, or delete files → \`apply_patch\`
 - Run shell commands → \`bash\`
@@ -75,7 +76,7 @@ export const V2_TOOL_MAPPING = `**Tool Mapping for OpenCode:**
 When skills request actions, substitute OpenCode equivalents:
 - Create or update todos → OpenCode v2 has no todo tool; track the plan in a markdown file (or the harness's plan facility) instead
 - \`Subagent (general-purpose):\` → \`subagent\` with \`agent: "general"\` (give it \`description\` and \`prompt\`, optionally \`background\`; pass \`sessionID\` to continue a previous subagent)
-- Invoke a skill → OpenCode's native \`skill\` tool
+- Invoke a skill → OpenCode's native \`skill\` tool. Skill ids are bare names, so drop the \`superpowers:\` prefix skills use when they name each other (\`superpowers:brainstorming\` → \`skill\` with \`id: "brainstorming"\`)
 - Read files → \`read\`
 - Create, edit, or delete files → use \`patch\` with \`patchText\` when available; otherwise use \`write\` to create or overwrite files, \`edit\` for targeted changes, and \`shell\` for deletion
 - Run shell commands → \`shell\` (\`command\`, \`workdir\`, \`timeout\`, \`background\`)
@@ -85,9 +86,13 @@ When skills request actions, substitute OpenCode equivalents:
 
 Use OpenCode's native \`skill\` tool to list and load skills.`;
 
+// Ouverture de tout bootstrap injecté. Les gardes « déjà injecté » matchent ce
+// préfixe exact (pas un simple `includes`), pour qu'un prompt qui mentionne la
+// balise (#2197) ne désactive pas l'injection.
+export const BOOTSTRAP_MARKER = '<EXTREMELY_IMPORTANT>\nYou have superpowers.';
+
 export const buildBootstrapContent = (body, toolMapping) =>
-  `<EXTREMELY_IMPORTANT>\n` +
-  `You have superpowers.\n\n` +
+  `${BOOTSTRAP_MARKER}\n\n` +
   `**IMPORTANT: The using-superpowers skill content is included below. It is ALREADY LOADED - you are currently following it. Do NOT use the skill tool to load "using-superpowers" again - that would be redundant.**\n\n` +
   `${body}\n\n` +
   `${toolMapping}\n` +
@@ -114,7 +119,9 @@ const readBootstrap = (personalDir, toolMapping = TOOL_MAPPING) => {
 export const applyBootstrap = (messages, bootstrap) => {
   const firstUser = messages.find((m) => m.info && m.info.role === 'user');
   if (!firstUser || !firstUser.parts || !firstUser.parts.length) return;
-  const existing = firstUser.parts.find((p) => p.type === 'text' && p.text.includes('EXTREMELY_IMPORTANT'));
+  const existing = firstUser.parts.find(
+    (p) => p.type === 'text' && typeof p.text === 'string' && p.text.startsWith(BOOTSTRAP_MARKER),
+  );
   if (existing) {
     existing.text = bootstrap;
     return;
@@ -133,7 +140,7 @@ export const applyBootstrapV2 = (messages, bootstrap) => {
   if (firstUser && (!Array.isArray(firstUser.content) || !firstUser.content.length)) return;
   if (firstUser) {
     const existing = firstUser.content.find(
-      (p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.includes('EXTREMELY_IMPORTANT'),
+      (p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.startsWith(BOOTSTRAP_MARKER),
     );
     if (existing) {
       existing.text = bootstrap;
@@ -231,8 +238,9 @@ export const PersonalSkillsPlugin = async () => {
 // 1. skills via ctx.skill.transform — enregistré APRÈS superpowers (ordre de
 //    config plugins), et editor.add = Map.set : à id identique, notre version
 //    remplace la leur (invariant « patch personnel gagne »).
-// 2. bootstrap via ctx.session.hook("context") — remplace le bootstrap
-//    superpowers s'il est déjà présent, sinon insère (sauf sessions-enfant).
+// 2. bootstrap via ctx.session.hook sur context/compaction/generate — remplace
+//    le bootstrap superpowers s'il est déjà présent, sinon insère (sauf
+//    sessions-enfant).
 async function setup(ctx) {
   // V1 peut aussi invoquer default.setup avec un ctx V1 dépourvu des domaines
   // skill/session — retour silencieux, le chemin V1 sert via server().
@@ -277,32 +285,42 @@ async function setup(ctx) {
     console.error('[personal-skills] skill registration failed:', err);
   }
 
-  // 2. Injection/remplacement du bootstrap dans le premier message user
-  try {
-    await ctx.session.hook('context', async (event) => {
-      try {
-        const bootstrap = readBootstrap(personalSkillsDir, V2_TOOL_MAPPING);
-        if (!bootstrap || !event.messages || !event.messages.length) return;
-        const firstUser = event.messages.find((m) => m && m.role === 'user');
-        if (firstUser && (!Array.isArray(firstUser.content) || !firstUser.content.length)) return;
-        const hasBootstrap = !!firstUser && firstUser.content.some(
-          (p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.includes('EXTREMELY_IMPORTANT'),
-        );
-        // Pas de bootstrap présent ⇒ session potentiellement enfant : ne jamais
-        // injecter le contrôleur dans un worker (superpowers #2160). Le chemin
-        // « remplacer » reste autorisé partout (remplacer = gagner, sans
-        // réinjecter dans les enfants : superpowers n'y en met jamais).
-        if (!hasBootstrap && typeof ctx.session.get === 'function' && await isChildSession(
-          (id) => ctx.session.get({ sessionID: id }),
-          event.sessionID,
-        )) return;
-        applyBootstrapV2(event.messages, bootstrap);
-      } catch (err) {
-        console.error('[personal-skills] context hook failed:', err);
-      }
-    });
-  } catch (err) {
-    console.error('[personal-skills] session hook registration failed:', err);
+  // 2. Injection/remplacement du bootstrap dans le premier message user.
+  // OpenCode 2 dispatche trois formes de requête — context (tour normal),
+  // compaction (résumé auto), generate (génération explicite) — et les plugins
+  // built-in de superpowers v7.0.2 s'enregistrent sur les trois. N'en couvrir
+  // qu'une laisserait le bootstrap upstream gagner sur les autres et ferait
+  // diverger le préfixe caché (superpowers #2391).
+  const injectBootstrap = async (event) => {
+    try {
+      const bootstrap = readBootstrap(personalSkillsDir, V2_TOOL_MAPPING);
+      if (!bootstrap || !event.messages || !event.messages.length) return;
+      const firstUser = event.messages.find((m) => m && m.role === 'user');
+      if (firstUser && (!Array.isArray(firstUser.content) || !firstUser.content.length)) return;
+      const hasBootstrap = !!firstUser && firstUser.content.some(
+        (p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.startsWith(BOOTSTRAP_MARKER),
+      );
+      // Pas de bootstrap présent ⇒ session potentiellement enfant : ne jamais
+      // injecter le contrôleur dans un worker (superpowers #2160). Le chemin
+      // « remplacer » reste autorisé partout (remplacer = gagner, sans
+      // réinjecter dans les enfants : superpowers n'y en met jamais).
+      if (!hasBootstrap && typeof ctx.session.get === 'function' && await isChildSession(
+        (id) => ctx.session.get({ sessionID: id }),
+        event.sessionID,
+      )) return;
+      applyBootstrapV2(event.messages, bootstrap);
+    } catch (err) {
+      console.error('[personal-skills] session hook failed:', err);
+    }
+  };
+  for (const hookName of ['context', 'compaction', 'generate']) {
+    try {
+      await ctx.session.hook(hookName, injectBootstrap);
+    } catch (err) {
+      // Un hook non supporté par la version d'OpenCode ne doit pas empêcher
+      // l'enregistrement des autres (même isolation que superpowers v7.0.2).
+      console.error(`[personal-skills] session hook registration failed (${hookName}):`, err);
+    }
   }
 
   // Note : le glob d'instructions du triptyque (.opencode/instructions/*.md)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test_init_machine.sh — init-machine.sh, exécuté sur un HOME simulé, doit :
-#   1. déclarer superpowers (pin #v7.0.0) + plugin personnel dans la config
+#   1. déclarer superpowers (pin #v7.0.2) + plugin personnel dans la config
 #      globale (clé "plugin" V1 fraîche / "plugins" V2 existante, jamais de
 #      conversion prématurée) + glob d'instructions du triptyque,
 #   2. installer le plugin personnel,
@@ -50,9 +50,9 @@ nb=$(find "$CFG_DIR/personal-skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc
 
 # --- Migration v2 : pin, glob instructions, clé V1 sur machine fraîche -------
 
-# Pin superpowers gelé sur #v7.0.0 (migration V2 interrompue → ancrée ici).
-grep -q 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.0' "$GLOBAL_CFG" \
-    || { echo "FAIL : pin superpowers #v7.0.0 absent de la config" >&2; exit 1; }
+# Pin superpowers gelé sur #v7.0.2 (hooks compaction/generate, ids nus, marqueur strict).
+grep -q 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.2' "$GLOBAL_CFG" \
+    || { echo "FAIL : pin superpowers #v7.0.2 absent de la config" >&2; exit 1; }
 
 # Glob d'instructions du triptyque déclaré en config (plus injecté par plugin).
 grep -q '\.opencode/instructions/\*\.md' "$GLOBAL_CFG" \
@@ -71,7 +71,7 @@ cfg = json.load(open(sys.argv[1]))
 p = cfg['plugin']
 up = next(i for i, e in enumerate(p) if isinstance(e, str) and e.startswith('superpowers@'))
 assert up + 1 < len(p) and p[up + 1].endswith('/plugins/personal-skills.js'), p
-assert p[up] == 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.0', p
+assert p[up] == 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.2', p
 assert cfg['instructions'].count('.opencode/instructions/*.md') == 1, cfg['instructions']
 assert len(p) == 2, p
 PY
@@ -87,7 +87,7 @@ p = cfg['plugin']
 assert len(p) == 2, p
 assert cfg['instructions'].count('.opencode/instructions/*.md') == 1
 PY
-echo "  [fresh] : OK (clé V1 préservée, pin #v7.0.0, glob instructions, idempotent)"
+echo "  [fresh] : OK (clé V1 préservée, pin #v7.0.2, glob instructions, idempotent)"
 
 # --- Clé adaptative : config déjà en forme V2 ⇒ "plugins" conservée ----------
 
@@ -97,7 +97,7 @@ cat > "$HOME2/.config/opencode/opencode.json" <<EOF
 {
   "\$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "superpowers@git+https://github.com/obra/superpowers.git#v7.0.0",
+    "superpowers@git+https://github.com/obra/superpowers.git#v7.0.2",
     "/opt/autre-plugin.js"
   ],
   "instructions": ["AGENTS.md"]

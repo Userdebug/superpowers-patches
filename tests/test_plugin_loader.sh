@@ -2,7 +2,7 @@
 # test_plugin_loader.sh — test d'intégration loader sous opencode 2.x.
 #
 # Vérifie, SANS appel modèle, sur un serveur opencode sandbox isolé :
-#   1. le duo superpowers(#v7.0.0) + mini-plugin personnel charge sans échec ;
+#   1. le duo superpowers(#v7.0.2) + mini-plugin personnel charge sans échec ;
 #   2. les 13 skills du dépôt résolvent avec le CONTENU du dépôt (jamais la
 #      version du cache superpowers pour les ids partagés, jamais un miroir
 #      ~/.agents/skills périmé) ;
@@ -49,7 +49,7 @@ cat > "$CFG/opencode.jsonc" <<EOF
 {
   "\$schema": "https://opencode.ai/config.json",
   "plugins": [
-    "superpowers@git+https://github.com/obra/superpowers.git#v7.0.0",
+    "superpowers@git+https://github.com/obra/superpowers.git#v7.0.2",
     "$CFG/plugins/personal-skills.js"
   ],
   "instructions": [".opencode/instructions/*.md"]
@@ -111,8 +111,8 @@ curl -s -m 10 -u "opencode:$PW" "http://127.0.0.1:$PORT/api/config" > "$TMP/conf
     || { echo "FAIL : /api/config a échoué" >&2; exit 1; }
 grep -q '\.opencode/instructions/\*\.md' "$TMP/config.json" \
     || { echo "FAIL : glob instructions absent de la config résolue" >&2; exit 1; }
-grep -q 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.0' "$TMP/config.json" \
-    || { echo "FAIL : pin superpowers #v7.0.0 absent de la config résolue" >&2; exit 1; }
+grep -q 'superpowers@git+https://github.com/obra/superpowers.git#v7.0.2' "$TMP/config.json" \
+    || { echo "FAIL : pin superpowers #v7.0.2 absent de la config résolue" >&2; exit 1; }
 grep -q "$CFG/plugins/personal-skills.js" "$TMP/config.json" \
     || { echo "FAIL : plugin personnel absent de la config résolue" >&2; exit 1; }
 
